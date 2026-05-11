@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NRP Sudoku</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(1, 97, 239, 0.18), transparent 38%),
+        radial-gradient(circle at 80% 90%, rgba(109, 40, 217, 0.16), transparent 38%),
+        linear-gradient(180deg, #02041a, #0a0f3a);
+      color: #e5ecf6;
+      font-family: 'Inter', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.55rem 0.5rem 0.7rem;
+      gap: 0.5rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      background: linear-gradient(135deg, #65c9ff, #a07dff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .meta {
+      display: flex;
+      gap: 1.1rem;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(229, 236, 246, 0.7);
+    }
+    .meta .v {
+      color: #f5c87d;
+      font-weight: 700;
+      font-size: 0.78rem;
+      margin-left: 0.35rem;
+    }
+    .meta .v.danger { color: #ff5e7e; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      width: min(56vh, 320px);
+      aspect-ratio: 1;
+      background: rgba(229, 236, 246, 0.04);
+      border: 2px solid #0161ef;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(1, 97, 239, 0.25);
+    }
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.85rem, 2.4vh, 1.2rem);
+      font-weight: 600;
+      cursor: pointer;
+      border-right: 1px solid rgba(229, 236, 246, 0.08);
+      border-bottom: 1px solid rgba(229, 236, 246, 0.08);
+      background: rgba(229, 236, 246, 0.02);
+      transition: background 0.12s, color 0.12s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cell.col-2, .cell.col-5 { border-right: 2px solid #0161ef; }
+    .cell.col-8 { border-right: none; }
+    .cell.row-2, .cell.row-5 { border-bottom: 2px solid #0161ef; }
+    .cell.row-8 { border-bottom: none; }
+    .cell.given { color: #c5d3ff; cursor: default; background: rgba(1, 97, 239, 0.06); }
+    .cell.selected { background: rgba(1, 97, 239, 0.32); }
+    .cell.peer { background: rgba(1, 97, 239, 0.10); }
+    .cell.correct { color: #7bf2c9; }
+    .cell.wrong { color: #ff5e7e; animation: shake 0.32s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-3px); }
+      75% { transform: translateX(3px); }
+    }
+    .nums {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 0.25rem;
+      width: min(56vh, 320px);
+    }
+    .num {
+      height: 2rem;
+      background: rgba(229, 236, 246, 0.04);
+      border: 1px solid rgba(229, 236, 246, 0.18);
+      color: #e5ecf6;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .num:hover { background: rgba(1, 97, 239, 0.22); border-color: #0161ef; transform: translateY(-1px); }
+    .num:active { transform: translateY(0); }
+    .actions {
+      display: flex;
+      gap: 0.45rem;
+    }
+    .btn {
+      padding: 0.42rem 0.85rem;
+      background: rgba(245, 200, 125, 0.13);
+      border: 1px solid rgba(245, 200, 125, 0.45);
+      color: #f5c87d;
+      font-family: inherit;
+      font-size: 0.62rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .btn:hover:not(:disabled) { background: rgba(245, 200, 125, 0.22); transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.32; cursor: not-allowed; }
+    .btn.primary {
+      background: rgba(1, 97, 239, 0.18);
+      color: #65c9ff;
+      border-color: rgba(101, 201, 255, 0.5);
+    }
+    .btn.primary:hover:not(:disabled) { background: rgba(1, 97, 239, 0.28); }
+    .status {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      min-height: 1.1rem;
+      text-align: center;
+    }
+    .status.win  { color: #7bf2c9; }
+    .status.lose { color: #ff5e7e; }
+  </style>
+</head>
+<body>
+  <h1>NRP Sudoku</h1>
+  <div class="meta">
+    <span>Hints<span class="v" id="hints">3</span></span>
+    <span>Strikes<span class="v" id="strikes">0</span><span style="opacity:0.5; margin-left:0.3rem;">/ 3</span></span>
+  </div>
+  <div class="board" id="board"></div>
+  <div class="nums" id="nums"></div>
+  <div class="actions">
+    <button class="btn primary" id="hint-btn">Hint</button>
+    <button class="btn" id="erase-btn">Erase</button>
+    <button class="btn" id="reset-btn">Reset</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <script>
+    const PUZZLE = [
+      [5,3,0,0,7,0,0,0,0],
+      [6,0,0,1,9,5,0,0,0],
+      [0,9,8,0,0,0,0,6,0],
+      [8,0,0,0,6,0,0,0,3],
+      [4,0,0,8,0,3,0,0,1],
+      [7,0,0,0,2,0,0,0,6],
+      [0,6,0,0,0,0,2,8,0],
+      [0,0,0,4,1,9,0,0,5],
+      [0,0,0,0,8,0,0,7,9]
+    ];
+    const SOLUTION = [
+      [5,3,4,6,7,8,9,1,2],
+      [6,7,2,1,9,5,3,4,8],
+      [1,9,8,3,4,2,5,6,7],
+      [8,5,9,7,6,1,4,2,3],
+      [4,2,6,8,5,3,7,9,1],
+      [7,1,3,9,2,4,8,5,6],
+      [9,6,1,5,3,7,2,8,4],
+      [2,8,7,4,1,9,6,3,5],
+      [3,4,5,2,8,6,1,7,9]
+    ];
+
+    const state = {
+      grid: PUZZLE.map(r => [...r]),
+      selected: null,
+      hints: 3,
+      strikes: 0,
+      done: false
+    };
+
+    const boardEl = document.getElementById('board');
+    const numsEl  = document.getElementById('nums');
+    const statusEl = document.getElementById('status');
+    const hintsEl  = document.getElementById('hints');
+    const strikesEl = document.getElementById('strikes');
+
+    function isPeer(r1, c1, r2, c2) {
+      if (r1 === r2 || c1 === c2) return true;
+      return Math.floor(r1/3) === Math.floor(r2/3) && Math.floor(c1/3) === Math.floor(c2/3);
+    }
+
+    function render() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const cell = document.createElement('div');
+          const v = state.grid[r][c];
+          cell.className = 'cell row-' + r + ' col-' + c;
+          if (PUZZLE[r][c] !== 0) cell.classList.add('given');
+          if (state.selected) {
+            const [sr, sc] = state.selected;
+            if (sr === r && sc === c) cell.classList.add('selected');
+            else if (isPeer(r, c, sr, sc)) cell.classList.add('peer');
+          }
+          if (v !== 0 && PUZZLE[r][c] === 0 && v === SOLUTION[r][c]) cell.classList.add('correct');
+          cell.textContent = v === 0 ? '' : v;
+          cell.onclick = () => select(r, c);
+          boardEl.appendChild(cell);
+        }
+      }
+      hintsEl.textContent = state.hints;
+      strikesEl.textContent = state.strikes;
+      strikesEl.className = state.strikes >= 2 ? 'v danger' : 'v';
+    }
+
+    function select(r, c) {
+      if (state.done) return;
+      state.selected = [r, c];
+      render();
+    }
+
+    function placeNumber(n) {
+      if (state.done || !state.selected) return;
+      const [r, c] = state.selected;
+      if (PUZZLE[r][c] !== 0) return;
+      if (state.grid[r][c] === SOLUTION[r][c]) return;
+      if (n === SOLUTION[r][c]) {
+        state.grid[r][c] = n;
+        if (isComplete()) {
+          state.done = true;
+          statusEl.textContent = 'Solved.';
+          statusEl.className = 'status win';
+        }
+      } else {
+        state.strikes++;
+        const cellEl = boardEl.children[r * 9 + c];
+        cellEl.textContent = n;
+        cellEl.classList.add('wrong');
+        setTimeout(() => render(), 360);
+        if (state.strikes >= 3) {
+          state.done = true;
+          statusEl.textContent = 'Three strikes — game over.';
+          statusEl.className = 'status lose';
+        }
+      }
+      render();
+    }
+
+    function useHint() {
+      if (state.done || !state.selected || state.hints === 0) return;
+      const [r, c] = state.selected;
+      if (PUZZLE[r][c] !== 0) return;
+      if (state.grid[r][c] === SOLUTION[r][c]) return;
+      state.grid[r][c] = SOLUTION[r][c];
+      state.hints--;
+      if (isComplete()) {
+        state.done = true;
+        statusEl.textContent = 'Solved (with hints).';
+        statusEl.className = 'status win';
+      }
+      render();
+    }
+
+    function eraseSelected() {
+      if (state.done || !state.selected) return;
+      const [r, c] = state.selected;
+      if (PUZZLE[r][c] !== 0) return;
+      if (state.grid[r][c] !== SOLUTION[r][c]) {
+        state.grid[r][c] = 0;
+        render();
+      }
+    }
+
+    function reset() {
+      state.grid = PUZZLE.map(r => [...r]);
+      state.selected = null;
+      state.hints = 3;
+      state.strikes = 0;
+      state.done = false;
+      statusEl.textContent = '';
+      statusEl.className = 'status';
+      render();
+    }
+
+    function isComplete() {
+      for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+        if (state.grid[r][c] !== SOLUTION[r][c]) return false;
+      }
+      return true;
+    }
+
+    for (let n = 1; n <= 9; n++) {
+      const b = document.createElement('button');
+      b.className = 'num';
+      b.textContent = n;
+      b.onclick = () => placeNumber(n);
+      numsEl.appendChild(b);
+    }
+
+    document.getElementById('hint-btn').onclick = useHint;
+    document.getElementById('erase-btn').onclick = eraseSelected;
+    document.getElementById('reset-btn').onclick = reset;
+
+    document.addEventListener('keydown', (e) => {
+      if (state.done) return;
+      const k = e.key;
+      if (k >= '1' && k <= '9') placeNumber(parseInt(k));
+      if (k === 'h') useHint();
+      if (k === 'Backspace' || k === 'Delete') eraseSelected();
+      if (state.selected) {
+        const [r, c] = state.selected;
+        let nr = r, nc = c;
+        if (k === 'ArrowUp')    nr = Math.max(0, r - 1);
+        if (k === 'ArrowDown')  nr = Math.min(8, r + 1);
+        if (k === 'ArrowLeft')  nc = Math.max(0, c - 1);
+        if (k === 'ArrowRight') nc = Math.min(8, c + 1);
+        if (nr !== r || nc !== c) { state.selected = [nr, nc]; render(); }
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

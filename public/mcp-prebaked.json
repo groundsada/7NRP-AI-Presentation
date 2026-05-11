@@ -1,0 +1,19 @@
+{
+  "prompt": "who's using the most GPU on NRP lately? show me the top 5",
+  "model": "nrp/minimax-m2",
+  "elapsed_seconds": 12,
+  "captured_at": "2026-05-05T18:30:00Z",
+  "tool_calls": [
+    { "name": "nrp-accounting_get_latest_data_date", "args": null },
+    { "name": "nrp-accounting_top_resource_consumers", "args": { "dimension": "namespace", "resource": "gpu", "start_date": "2026-04-04", "end_date": "2026-05-04", "limit": 5 } }
+  ],
+  "rows": [
+    { "namespace": "braingeneers",   "gpu_hours": 135103 },
+    { "namespace": "upenn-dyer-lab", "gpu_hours": 132646 },
+    { "namespace": "csuf-research",  "gpu_hours": 128552 },
+    { "namespace": "cms-ml",         "gpu_hours":  93646 },
+    { "namespace": "ucsd-haosulab",  "gpu_hours":  78291 }
+  ],
+  "summary": "The top 5 namespaces collectively consumed ~568K GPU hours over the last 30 days, with braingeneers leading at 135K hours, followed closely by upenn-dyer-lab at 133K; csuf-research and cms-ml show steady research/machine learning workloads, while ucsd-haosulab rounds out the top 5 at 78K hours.",
+  "raw_output": "| Namespace | GPU Hours |\n|-----------|-----------|\n| braingeneers | 135,103 |\n| upenn-dyer-lab | 132,646 |\n| csuf-research | 128,552 |\n| cms-ml | 93,646 |\n| ucsd-haosulab | 78,291 |\n\n**Summary:** The top 5 namespaces collectively consumed ~568K GPU hours over the last 30 days, with braingeneers leading at 135K hours, followed closely by upenn-dyer-lab at 133K; csuf-research and cms-ml show steady research/machine learning workloads, while ucsd-haosulab rounds out the top 5 at 78K hours."
+}

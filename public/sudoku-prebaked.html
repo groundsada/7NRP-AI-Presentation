@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#1a1a2e;--cell:#16213e;--cell-edit:#0f3460;--text:#e94560;--text-light:#eee;--accent:#533483;--success:#4ecca3;--error:#ff6b6b;--border:#2a2a4a}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text-light);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:1rem}
+h1{color:var(--text);margin-bottom:1rem;font-size:1.8rem}
+.stats{display:flex;gap:2rem;margin-bottom:1rem;font-size:1.1rem}
+.stat{color:var(--text-light)}
+.stat span{color:var(--accent);font-weight:bold}
+.board{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;background:var(--border);padding:2px;border-radius:4px;max-width:450px;width:100%;aspect-ratio:1}
+.cell{background:var(--cell);display:flex;align-items:center;justify-content:center;font-size:clamp(1rem,4vw,1.5rem);font-weight:bold;cursor:pointer;transition:.2s;user-select:none;min-height:40px}
+.cell:nth-child(3n){border-right:2px solid var(--accent)}
+.cell:nth-child(9n){border-right:none}
+.cell:nth-child(n+19):nth-child(-n+27),.cell:nth-child(n+46):nth-child(-n+54),.cell:nth-child(n+73):nth-child(-n+81){border-bottom:2px solid var(--accent)}
+.cell.fixed{color:var(--text);cursor:default}
+.cell:hover:not(.fixed){background:var(--cell-edit)}
+.cell.selected{background:var(--accent);color:var(--text-light)}
+.cell.error{color:var(--error);animation:shake .3s}
+.cell.hint{color:var(--success)}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.keypad{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;max-width:450px;width:100%;margin-top:1rem}
+.key{background:var(--cell);border:none;color:var(--text-light);padding:.8rem;font-size:1.2rem;border-radius:4px;cursor:pointer;transition:.2s}
+.key:hover{background:var(--accent)}
+.key:active{transform:scale(.95)}
+.buttons{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap;justify-content:center}
+.btn{background:var(--accent);color:var(--text-light);border:none;padding:.7rem 1.5rem;border-radius:4px;cursor:pointer;font-size:1rem;transition:.2s}
+.btn:hover{opacity:.8}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.win{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:2rem;color:var(--success);z-index:100}
+.win button{margin-top:1rem}
+</style>
+</head>
+<body>
+<h1>Sudoku</h1>
+<div class="stats">
+<div class="stat">Hints: <span id="hints">3</span></div>
+<div class="stat">Strikes: <span id="strikes">0</span>/3</div>
+</div>
+<div class="board" id="board"></div>
+<div class="keypad" id="keypad"></div>
+<div class="buttons">
+<button class="btn" id="hintBtn">Hint</button>
+<button class="btn" id="newBtn">New Game</button>
+<button class="btn" id="clearBtn">Clear</button>
+</div>
+<div class="win" id="win" style="display:none">
+<p>You Win!</p>
+<button class="btn" onclick="newGame()">Play Again</button>
+</div>
+<script>
+const SIZE=9,BOX=3;
+let board=[],solution=[],hints=3,strikes=0,selected=null;
+
+function generate(){
+  board=Array(SIZE).fill().map(()=>Array(SIZE).fill(0));
+  solution=Array(SIZE).fill().map(()=>Array(SIZE).fill(0));
+  fillBoard(0,0);
+  for(let i=0;i<SIZE;i++)for(let j=0;j<SIZE;j++)solution[i][j]=board[i][j];
+  const holes=40+Math.floor(Math.random()*10);
+  let placed=0;
+  while(placed<holes){
+    const r=Math.floor(Math.random()*9),c=Math.floor(Math.random()*9);
+    if(board[r][c]!==0){board[r][c]=0;placed++}
+  }
+}
+
+function fillBoard(r,c){
+  if(r===SIZE-1&&c===SIZE)return true;
+  if(c===SIZE){r++;c=0}
+  const nums=[...Array(9).keys()].map(i=>i+1).sort(()=>Math.random()-.5);
+  for(const n of nums){
+    if(isValid(r,c,n)){board[r][c]=n;if(fillBoard(r,c+1))return true;board[r][c]=0}
+  }
+  return false;
+}
+
+function isValid(r,c,n){
+  for(let i=0;i<SIZE;i++)if(board[r][i]===n)return false;
+  for(let i=0;i<SIZE;i++)if(board[i][c]===n)return false;
+  const br=Math.floor(r/BOX)*BOX,bc=Math.floor(c/BOX)*BOX;
+  for(let i=0;i<BOX;i++)for(let j=0;j<BOX;j++)if(board[br+i][bc+j]===n)return false;
+  return true;
+}
+
+function render(){
+  const el=document.getElementById('board');
+  el.innerHTML='';
+  for(let i=0;i<SIZE;i++)for(let j=0;j<SIZE;j++){
+    const cell=document.createElement('div');
+    cell.className='cell'+(board[i][j]!==0?' fixed':'');
+    cell.textContent=board[i][j]||'';
+    cell.dataset.r=i;cell.dataset.c=j;
+    cell.addEventListener('click',()=>selectCell(i,j));
+    el.appendChild(cell);
+  }
+  updateStats();
+}
+
+function selectCell(r,c){
+  if(solution[r][c]===0||board[r][c]===solution[r][c])selected={r,c};
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected'));
+  if(selected)document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`)?.classList.add('selected');
+}
+
+function input(n){
+  if(!selected)return;
+  const {r,c}=selected;
+  if(solution[r][c]!==0)return;
+  const cell=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  if(n===0){
+    board[r][c]=0;cell.textContent='';cell.classList.remove('error');
+  }else if(n===solution[r][c]){
+    board[r][c]=n;cell.textContent=n;cell.classList.remove('error');
+    checkWin();
+  }else{
+    cell.classList.add('error');
+    strikes++;
+    updateStats();
+    if(strikes>=3){
+      alert('Game Over! The solution was shown.');
+      revealAll();
+    }
+  }
+}
+
+function useHint(){
+  if(hints<=0)return;
+  const empty=[];
+  for(let i=0;i<SIZE;i++)for(let j=0;j<SIZE;j++)if(board[i][j]!==solution[i][j]&&solution[i][j]!==0)empty.push({i,j});
+  if(empty.length===0)return;
+  const {i,j}=empty[Math.floor(Math.random()*empty.length)];
+  board[i][j]=solution[i][j];
+  const cell=document.querySelector(`.cell[data-r="${i}"][data-c="${j}"]`);
+  cell.textContent=board[i][j];cell.classList.add('hint');cell.classList.remove('selected');
+  hints--;
+  updateStats();
+  setTimeout(()=>cell.classList.remove('hint'),2000);
+  checkWin();
+}
+
+function checkWin(){
+  for(let i=0;i<SIZE;i++)for(let j=0;j<SIZE;j++)if(board[i][j]!==solution[i][j])return;
+  document.getElementById('win').style.display='flex';
+}
+
+function revealAll(){
+  for(let i=0;i<SIZE;i++)for(let j=0;j<SIZE;j++){
+    board[i][j]=solution[i][j];
+  }
+  render();
+}
+
+function updateStats(){
+  document.getElementById('hints').textContent=hints;
+  document.getElementById('strikes').textContent=strikes;
+  document.getElementById('hintBtn').disabled=hints<=0;
+}
+
+function newGame(){
+  hints=3;strikes=0;selected=null;
+  document.getElementById('win').style.display='none';
+  generate();render();
+}
+
+function initKeypad(){
+  const el=document.getElementById('keypad');
+  for(let i=1;i<=9;i++){
+    const k=document.createElement('button');k.className='key';k.textContent=i;
+    k.addEventListener('click',()=>input(i));el.appendChild(k);
+  }
+  const c=document.createElement('button');c.className='key';c.textContent='X';
+  c.addEventListener('click',()=>input(0));el.appendChild(c);
+}
+
+document.getElementById('hintBtn').addEventListener('click',useHint);
+document.getElementById('newBtn').addEventListener('click',newGame);
+document.getElementById('clearBtn').addEventListener('click',()=>input(0));
+document.addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='9')input(parseInt(e.key));if(e.key==='0'||e.key==='Backspace')input(0)});
+
+initKeypad();newGame();
+</script>
+</body>
+</html>
