@@ -25,6 +25,12 @@ const PROMPT = [
 const MODEL = 'nrp/minimax-m2'
 
 export default defineConfig({
+  server: {
+    fs: {
+      strict: false,
+      allow: ['..', PUBLIC_DIR],
+    },
+  },
   plugins: [
     {
       name: 'opencode-runner',
